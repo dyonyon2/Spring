@@ -97,12 +97,76 @@ SPRING 강의
 
 - Spring Boot's Goal
   - Build Quickly 
-    - Spring Initializer
-    - Spring Boot Starter Projects (빠른 종속성 정의)
-    - Spring Boot Auto Configuration 
-    - Spring Boot DevTools
+    - (1) Spring Initializer => https://start.spring.io/
+    - (2) Spring Boot Starter Projects (빠른 종속성 정의)
+    - (3) Spring Boot Auto Configuration 
+    - (4) Spring Boot DevTools
   - Production-Ready
     - Logging
     - Different configuration for different environments (Profiles, ConfigurationProperies)
     - Monitoring (Spring Boot Actuator)
 
+(2) Spring Boot Starter Projects
+- Starters : Convenient dependency descriptors for diff. features
+- Spring Boot provides variety of starter projects:
+  - Web Application & REST API : Spring Boot Starter Web(spring-webmvc, spring-web, spring-boot-starter-tomcat, spring-boot-starter-json)
+  - Unit Tests : Srping Boot Starter Test
+  - Talk to database using JPA : Spring Boot Starter Data JPA
+  - Talk to database using JDBC : Spring Boot Starter JDBC
+  - Secure your web application or REST API : Spring Boot Starter Security
+
+(3) Spring Boot Auto Configuration 
+- Component Scan, DispatcherServlet, Data Sources, JSON Converison 등등 많은 configuration이 존재
+- spring-boot-autoconfigure-3.1.2.jar 에서 쫙 불러올 수 있도록 클래스 파일들이 있음
+
+(4) Spring Boot DevTools
+- Increase developer productivity => ex) 코드 수정 자동 반영 without 서버 재시작
+- *** pom.xml은 변경시 직접 재시작이 필요하다! ***
+
+(5) Production Ready
+  1) Profiles
+    - Spring Different Configuration 설정 
+    - Profiles : Environment specific configuration
+    - resource/application.properties에서 logging등 환경에 대한 설정을 할 수 있다.
+      dev, real, prod 등 여러 profile을 만들어 각 환경에 대한 설정을 각자해줄 수 있다.
+      spring.profiles.active=prod  => application-prod.properties 자동으로 불러준다.
+  2) ConfigurationProperties => 위의 application.properties의 설정 값을 app에서 사용하는 방법
+    - Application 내에서 사용할 수 있는 properties 구성
+    - @ConfigurationProperties(prefix="prefix이름")의 클래스를 만든 뒤, application.properties에서 세팅해주면 Application 상에서 사용가능하다.
+  3) Embedded Servers
+    - 예전 배포 방식 (WAR Approach)
+      1. Install Java
+      2. Install Web/Application Server (Tomcat, Weblogic, WebSphere etc)
+      3. Deploy the application WAR (Web ARchive) : 설정 복잡
+    - Embedded Server 방식 (Embedded Approach)
+      1. Install Java
+      2. Run JAR file (using embedded server - Tomcat ..)
+
+      ex) Project 우클릭 -> Run as -> Maven Build -> goal에 clean install 입력 -> 실행 -> jar 생성 -> java -jar jar파일 (jar 파일 java로 실행하면 끝)
+
+      Embedded Server Example) spring-boot-starter-tomcat, jetty, undertow
+  4) Actuator (Monitoring)
+    - Provides a number of endpoints:
+      - beans : Complete list of Spring beans in your app
+      - health : Application health information
+      - metrics : Application metrics
+      - mappings : Details around Request Mappings
+    - pom.xml에 actuator 추가한 뒤, application.properties에서 actuator로 볼 수 있는 범위를 결정한 뒤, web에서 url/actuator로 이동하면 서버의 많은 정보들을 확인할 수 있다.
+      ex) beans(application의 전체 spring bean 출력), caches(사용가능한 cache 정보), env(Spring Boot의 현재 환경 설정), health(application의 현재 상태), metrics(metrics 정보) 등등의 많은 정보들을 모니터링 할 수 있다.
+
+*** Spring Boot vs Spring MVC vs Spring ***
+  - Srping Framework : Dependency Injection
+    - @Component, @Autowired, Component Scan etc...
+    - Just Dependency Injection is Not sufficient (need other framworks to build apps)
+      ex) Hibernate/JPA for DB, JUnit & Mockito for Unit Testing
+  - Spring MVC(Spring Module) : Simplify building web apps and REST API
+    - Building web applications with Struts was very complex
+    - @Controller, @RestController, @RequestMapping("/courses")
+  - Spring Boot(Spring Project) : Build PRODUCTION-READY apps QUICKLY
+    - Starter Projects : Make it easy to build variety of applications
+    - Auto Configuration : Eliminate configuration to setup Spring, Spring MVC and other frameworks
+    - Enable non functional requirements (NFRs)
+      - Actuator : Enables Advanced Monitoring of application
+      - Embedded Server : No need for separate application servers
+      - Logging and Error Handling
+      - Profiles and ConfigurationProperties
