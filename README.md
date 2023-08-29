@@ -170,3 +170,7 @@ SPRING 강의
       - Embedded Server : No need for separate application servers
       - Logging and Error Handling
       - Profiles and ConfigurationProperties
+
+Section 9. Spring AOP
+- AOP(Aspect-Oriented Programming, 관점지향 프로그래밍) : 기존의 OOP(객체지향 프로그래밍)을 보완하기 위하여 만들어졌으며, 기존 객체 지향은 목적에 따라 클래스를 만들고 객체를 만들었다. APP Layer, Business Layer, Data Layer 이렇게 나눠서 분리하지만, 이 전체를 관통하는 부가기능 로직이 존재하고 이를 횡단 관심사(cross-cutting concerns)라고 한다. 
+  ex) Logging, Security, Transaction
