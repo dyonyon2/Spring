@@ -69,6 +69,8 @@ SPRING 강의
   - @Service - Business Service Facade. Business Layer에서 사용
   - @Controller - Controller in MVC pattern. Web Layer에서 사용
 
+  - Bean 등록 방법 - @Bean, @Configuration, @Component
+
 - JunitTest
   - Java에서 제공하는 일반적인 단위 테스트임.
   - 단위(모듈) 테스트에서 많이 사용됨
@@ -174,3 +176,26 @@ SPRING 강의
 Section 9. Spring AOP
 - AOP(Aspect-Oriented Programming, 관점지향 프로그래밍) : 기존의 OOP(객체지향 프로그래밍)을 보완하기 위하여 만들어졌으며, 기존 객체 지향은 목적에 따라 클래스를 만들고 객체를 만들었다. APP Layer, Business Layer, Data Layer 이렇게 나눠서 분리하지만, 이 전체를 관통하는 부가기능 로직이 존재하고 이를 횡단 관심사(cross-cutting concerns)라고 한다. 
   ex) Logging, Security, Transaction
+  - Main class에서 CommandLineRunner implement하고, autowired를 통해 business bean을 가져올 수 있고, run method에서 이 bean을 사용할 수 있다.
+  - AOP 클래스는 @Aspect으로 설정할 수 있고, @Configuration을 통해 Bean을 등록한다.
+    - @Before("execution(* PACKAGE.*.*(..))")을 통하여 Before에서 설정한 메소드가 실행되기 전에 Intercept할 수 있도록 한다.
+    => 이를 통해, 특정 method를 실행하기 전에 user의 access를 확인하는 등의 작업이 가능하다.
+    - Pointcut : execution(* PACKAGE.*.*(..))
+      Advice : Intercept하여 실행하는 부분
+      Aspect = Pointcut + Advice
+      JoinPoint : Specific Execution Interception
+      Weaving : Intercept가 적절한 시간에 일어나고 처리되는 Process
+      Weaver : Weaving에 사용된 Framework (Aspect)
+    - @After(실행 성공 여부 관계없이), @AfterReturning(실행 성공), @AfterThrowing(실행 실패) 를 통하여 성공 후 리턴 값을 가져오거나, 실패 후 에러를 가져오거나 할 수 있다.
+    - @Around 를 통해서 method 실행 전, 후, 예외 발생 시점 등 공통 기능 수행이 가능하다.     ProceedingJoinPoint를 사용하여 method를 직접 proceed 시켜야 하며, return 값도 받아서 return 해주어야 실제 method를 호출하는 곳에서 return을 받을 수 있다.
+    - Pointcut을 각 Aspect 클래스 내에서 지정하는 것은 대규모 프로젝트에는 맞지 않는다. 공통 JoinPointConfig 클래스를 만들어서 method에 @Pointcut을 사용하여 pointcut을 등록한 뒤, pointcut을 사용하는 곳에서 해당 method를 넣어주면 된다. 
+      ex) 전 : @Before("execution(* com.in28minutes.spring.aop.aop.data.*.*(..))")
+          후 : @Before("com.in28minutes.spring.aop.aop.aspect.CommonJoinPointConfig.dataLayerExecution()")
+    - 위의 것과 같은 두개의 pointcut을 &&로 같이 사용 가능
+      ex) @Pointcut("com.in28minutes.spring.aop.aop.aspect.CommonJoinPointConfig.dataLayerExecution() && com.in28minutes.spring.aop.aop.aspect.CommonJoinPointConfig.businessLayerExecution()")  public void allLayerExecution() {}
+    - bean 이름으로도 가능하다.
+      ex) @Pointcut("bean(dao*)") public void beanContainingDao() {}
+    - 패키지 내의(계층내의) 모든 호출도 intercept가 가능하다.
+      ex) @Pointcut("within(com.in28minutes.spring.aop.aop.data..별)") public void dataLayerExecutionWithWithin() {}   => 별을 기호로하면 밑에 글자가 이상해져서 한글로 일단 적어놓음! SUBLIME이 md에서 사용하는 별을 특정 명령어로 인식하는 듯
+    - annotation을 만들어서 해당 annotation이 붙은 특정 method만 intercept할 수 있다.
+      ex) @Target(ElementType.METHOD) @Retention(RetentionPolicy.RUNTIME) public @interface TrackTime { } 로 어노테이션을 만들고 method에 annotation을 붙여서 사용할 수 있다.
