@@ -199,3 +199,5 @@ Section 9. Spring AOP
       ex) @Pointcut("within(com.in28minutes.spring.aop.aop.data..별)") public void dataLayerExecutionWithWithin() {}   => 별을 기호로하면 밑에 글자가 이상해져서 한글로 일단 적어놓음! SUBLIME이 md에서 사용하는 별을 특정 명령어로 인식하는 듯
     - annotation을 만들어서 해당 annotation이 붙은 특정 method만 intercept할 수 있다.
       ex) @Target(ElementType.METHOD) @Retention(RetentionPolicy.RUNTIME) public @interface TrackTime { } 로 어노테이션을 만들고 method에 annotation을 붙여서 사용할 수 있다.
+
+Section 10. Spring JDBC, JPA and Spring Data
