@@ -201,3 +201,9 @@ Section 9. Spring AOP
       ex) @Target(ElementType.METHOD) @Retention(RetentionPolicy.RUNTIME) public @interface TrackTime { } 로 어노테이션을 만들고 method에 annotation을 붙여서 사용할 수 있다.
 
 Section 10. Spring JDBC, JPA and Spring Data
+- JDBC : Connection 연결 -> PreparedStatement 만들기 -> execute Query -> Resultset 으로 받고 -> PreparedStatement 닫기 -> connection 닫기
+- Spring JDBC : JdbcTemplate와 BeanPropertyRowMapper를 사용하여 DAO를 만들어 사용하면 끝
+  - result를 저장하는 방식
+    1. BeanPropertyRowMapper 사용 => new BeanPropertyRowMapper<Person>(Person.class); 이런식으로 사용
+    2. RowMapper를 implement한 사용자 RowMapper를 만든다 => class PersonRowMapper implements RowMapper<Person>{ /*ResultSet 가지고 클래스에 set변수 한 뒤 객체 반환*/ }
+- JPA : 
