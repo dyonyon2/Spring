@@ -2,14 +2,34 @@ package com.in28minutes.database.databasedemo.entity;
 
 import java.util.Date;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.NamedQuery;
+
+@Entity
+//@Table(name="person") // class 명과 동일해서 생략 가능
+@NamedQuery(name="find_all_person",query="select p from Person p")
 public class Person {
+	
+	@Id
+	@GeneratedValue
 	private int id;
+	
+	//@Column(name="name") // 변수 명과 동일해서 생략 가능
 	private String name;
 	private String location;
 	private Date birthDate;
 	
 	public Person() {
 		
+	}
+	
+	public Person(String name, String location, Date birthDate) {
+		super();
+		this.name = name;
+		this.location = location;
+		this.birthDate = birthDate;
 	}
 	
 	public Person(int id, String name, String location, Date birthDate) {
@@ -19,6 +39,7 @@ public class Person {
 		this.location = location;
 		this.birthDate = birthDate;
 	}
+	
 	public int getId() {
 		return id;
 	}
