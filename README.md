@@ -206,4 +206,17 @@ Section 10. Spring JDBC, JPA and Spring Data
   - result를 저장하는 방식
     1. BeanPropertyRowMapper 사용 => new BeanPropertyRowMapper<Person>(Person.class); 이런식으로 사용
     2. RowMapper를 implement한 사용자 RowMapper를 만든다 => class PersonRowMapper implements RowMapper<Person>{ /*ResultSet 가지고 클래스에 set변수 한 뒤 객체 반환*/ }
-- JPA : 
+- JDBC & Spring JDBC : 쿼리를 작성한 뒤, ?에 값을 매핑해준다. 쿼리를 실행한 뒤 결과는 Mapping해서 사용한다.
+  => 테이블과 쿼리가 많아지면 유지보수가 매우 어렵다. -> JPA가 필요함
+- JPA : EntityManager를 통해서 작업한다.
+
+Section 11. Web Applications With Spring MVC
+- war : Web archive / jar : Java ARchive
+- servlet : 간단한 Java Class이다. 입력을 받으면 응답을 제공하는 것이 서블릿의 기본 기능이다.
+- 처리 순서 : 
+    1. HttpServlet 사용
+      Browser sends http request to web server
+      Code in Web Server => Input HttpRequest, Output HttpResponse
+      Web Server responds with Http Response
+    2. JPA 사용
+      Servlet 방식으로 정적 사이트를 작성하기에는 어려움이 있어서 JSP(Java Server Page)를 사용한다. JSP도 결국 마지막에는 Servlet으로 전환되는 로직이긴 하다. (성능상으로 도움이 되지는 않는다. But )
