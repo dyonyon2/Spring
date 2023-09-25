@@ -212,11 +212,151 @@ Section 10. Spring JDBC, JPA and Spring Data
 
 Section 11. Web Applications With Spring MVC
 - war : Web archive / jar : Java ARchive
+- web.xml내 welcome-file은 URL을 redirect 시켜준다.
 - servlet : 간단한 Java Class이다. 입력을 받으면 응답을 제공하는 것이 서블릿의 기본 기능이다.
+  - @WebServlet(urlPatterns="/login.do") annotation을 추가하고 
+  - HttpServlet을 extends하여 doGet을 통해 response를 작성한다.
+- JSP : Java Servlet을 동적 웹페이지를 만들기 쉽게 쓰기 위해 만들어진 기술이며, 마지막에는 servlet으로 변환되어 클라이언트에 제공된다.
+  - getRequestDispatcher를 통해 request를 jsp로 forward해준다.
 - 처리 순서 : 
-    1. HttpServlet 사용
+  - 1. HttpServlet 사용
       Browser sends http request to web server
       Code in Web Server => Input HttpRequest, Output HttpResponse
       Web Server responds with Http Response
-    2. JPA 사용
-      Servlet 방식으로 정적 사이트를 작성하기에는 어려움이 있어서 JSP(Java Server Page)를 사용한다. JSP도 결국 마지막에는 Servlet으로 전환되는 로직이긴 하다. (성능상으로 도움이 되지는 않는다. But )
+  - 2. JSP 사용
+      Servlet 방식으로 동적 사이트를 작성하기에는 어려움이 있어서 JSP(Java Server Page)를 사용한다. JSP도 결국 마지막에는 Servlet으로 전환되는 로직이긴 하다. (성능상으로 도움이 되지는 않는다. But JSP에서는 동적 페이지를 만들기가 쉬워서 사용하는 것임)
+
+- 웹 사이트에서 서버로 데이터 전달하는 방법 (GET/POST)
+  - 1. GET(Query String) : URL에 파라미터로 데이터를 넘기는 방법
+    - ?키=값 형식을 통해 파라미터를 전달(& 구분자)
+    - request.getParameter("키")를 통해 값을 받아올 수 있음. 
+    - Get 방식의 URL 내 쿼리스트링을 이용하는 요청은 보안 이슈가 있다. 그래서 Post 방식의 HTTP 요청이 있다.
+  - 2. POST(Form Data) : form을 태그를 통하여 POST 방식으로 데이터 전달
+    - request.getParameter("키")를 통해 값을 받아올 수 있음. 
+  
+- JSP로 어떤 값을 넘기는 방법 (Expression/JAVA IN JSP)
+  - 1. Expression Language : request에 attribute로 키-값 쌍을 설정, jsp에서 ${키}로 값 사용
+    - ex) URL, ?name=dyonyon -> 
+    Servlet, String name = request.getParameter("name") & request.setAttribute("name",name); -> 
+    JSP, ${name}
+  - 2. JSP에서 <% %>를 사용하여 java 사용하기 => JAVA로 비즈니스 로직이 많이 들어가기 때문에 이 방법은 거의 사용하지 않음
+    - ex) <% String name = request.getParameter("name") %> 
+      Hello <%=name%>
+
+
+- Spring MVC
+  - Dispatcher Servlet이 URL을 보고 적절한 Controller를 찾아서 전달하고, Controller에서 처리 후 return 하면, 결과에 따라 Dispatcher Servlet이 다른 뷰나 컨트롤러로 redirection한다. (@ResponseBody annotation이 있다면 컨트롤러가 브라우저에게 직접 응답 body를 반환한다.)
+  - Dispatcher Controller
+    - ex) web.xml
+          <servlet>
+              <servlet-name>dispatcher</servlet-name>
+              <servlet-class>
+                  org.springframework.web.servlet.DispatcherServlet
+              </servlet-class>
+              <init-param>
+                  <param-name>contextConfigLocation</param-name>
+                  <param-value>/WEB-INF/todo-servlet.xml</param-value>
+              </init-param> 
+              <load-on-startup>1</load-on-startup>
+          </servlet>
+
+          <servlet-mapping>
+              <servlet-name>dispatcher</servlet-name>
+              <url-pattern>/spring-mvc/*</url-pattern>
+          </servlet-mapping>
+
+    - ex) todo-servlet.xml
+      <beans xmlns="http://www.springframework.org/schema/beans"
+        xmlns:context="http://www.springframework.org/schema/context"
+        xmlns:mvc="http://www.springframework.org/schema/mvc"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+    
+        <context:component-scan base-package="com.in28minutes" />
+        <mvc:annotation-driven /> 
+      </beans>
+
+  - Controller
+    - @Controller : MVC중 Controller 의미
+    - @RequestMapping(value="url") : HTTP 요청중 url 매핑됨.
+    - @ResponseBody : 직접 응답하기위한 annotation
+      - ex) web.xml
+        LoginController.java
+        @Controller
+        public class LoginController {
+
+          @RequestMapping(value="/login")
+          public String sayHello() {
+            return "Hello World";
+          }
+        }
+
+      - ex) URL = localhost:8080/spring-mvc/login
+        -> Dispatcher Servlet -> /login -> LoginController
+        -> sayHello() -> return "Hello World" to Dispatcher 
+
+      - ex) web.xml
+        ...
+          @RequestMapping(value="/login")
+          @ResponseBody
+          public String sayHello() {
+            return "Hello World";
+          }
+        }
+        => HTML Response "Hello World"
+
+  - View (JSP)
+    - View Resolver 설정 : jsp 찾을 수 있도록, prefix, suffix 추가가 끝
+      - ex) todo-servlet.xml
+        <beans xmlns="http://www.springframework.org/schema/beans"
+          xmlns:context="http://www.springframework.org/schema/context"
+          xmlns:mvc="http://www.springframework.org/schema/mvc"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+          http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
+          http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+      
+          <context:component-scan base-package="com.in28minutes" />
+          <bean
+            class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+            <property name="prefix">
+                <value>/WEB-INF/views/</value>
+            </property>
+            <property name="suffix">
+                <value>.jsp</value>
+            </property>
+          </bean>
+          <mvc:annotation-driven /> 
+        </beans>
+
+  - sl4j 설정
+    - pom.xml에 dependency 추가
+      - <dependency>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+          <version>1.2.17</version>
+        </dependency>
+
+    - resource에 값 추가
+      - log4j.properties
+        - log4j.rootLogger=DEBUG, Appender1
+ 
+          log4j.appender.Appender1=org.apache.log4j.ConsoleAppender
+          log4j.appender.Appender1.layout=org.apache.log4j.PatternLayout
+          log4j.appender.Appender1.layout.ConversionPattern=%-7p %d [%t] %c %x - %m%n
+  
+  - Model 
+    - Controller에서 @RequestMapping에 method로 GET, POST 구분 가능
+      - @RequestMapping(value="/login", method=RequestMethod.GET)
+      - @RequestMapping(value="/login", method=RequestMethod.POST)
+    - @RequestParam : Request의 파라미터 값 가져오는 방법
+      - ex) @RequestMapping(value="/login", method=RequestMethod.POST)
+              public String handleLoginRequest(@RequestParam String name, @RequestParam String password, ModelMap model) {
+              model.put("name", name);
+              model.put("password", password);
+
+              return "welcome";
+            }
+    - RequestParam으로 request의 파라미터 값을 가져와서 ModelMap에 put해주면 JSP에서 ${키}로 동일하게 사용 가능!!
