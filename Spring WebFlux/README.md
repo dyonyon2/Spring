@@ -73,29 +73,39 @@
       - Reactive Programming의 기반.
       - Specification: 4개의 Interface! (Publisher, Subscriber, Subscription, Processor)
         - Publisher : Method 1개 
-          - public interface Publisher< T > {
+          - ```
+            public interface Publisher< T > {
               public void subscribe(Subscriber<? super T> s);
             }
+            ```
           - Publiser represents the DataSource (ex. DB, RemoteService)
         - Subscriber : Method 4개 
-          - public interface Subscriber< T > {
+          - ```
+            public interface Subscriber< T > {
               public void onSubscribe(Subscription s);
               public void onNext(T t);
               public void onError(Throwable t);
               public onComplete();
             }
+            ```
           - OnNext() is how the data is sent to the caller from the data source
           - onComplete() is how the data source notifies the app that there is no more data.
         - Subscription : Method 2개. 
-          - public interface Subscription {
+          - ```
+            public interface Subscription {
               public void request(long n);
               public void cancel();
             }
+            ```
           - Subscription interface is a one which connects the app and the data source.
           - request() : a request call from app requesting for data
           - cancel() : once the app decides that it does not require any more data, then it sends a cancel request to the data source.
         - Processor : 
-          - public interface Processor< T, R> extends Subscriber< T >, Publisher< R > {}
+          - ```
+          public interface Processor<T,R> extends Subscriber<T>, Publisher<R> {
+
+            }
+            ```
           - Processor behaves as a publisher and also as a subscriber.
           - 잘 사용하지는 않음
         - Success Scenario
@@ -141,7 +151,7 @@
           ```
           public class FluxAndMonoGeneratorService {
               public Flux<String> namesFlux(){
-                  return Flux.fromIterable(List.of("dyonyon","sojoong","young")); //db or a
+                  return Flux.fromIterable(List.of("dyonyon","sojoong","young")); 
               }
 
               public Mono<String> nameMono(){

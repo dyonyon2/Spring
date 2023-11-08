@@ -248,6 +248,7 @@ Section 11. Web Applications With Spring MVC
   - Dispatcher Servlet이 URL을 보고 적절한 Controller를 찾아서 전달하고, Controller에서 처리 후 return 하면, 결과에 따라 Dispatcher Servlet이 다른 뷰나 컨트롤러로 redirection한다. (@ResponseBody annotation이 있다면 컨트롤러가 브라우저에게 직접 응답 body를 반환한다.)
   - Dispatcher Controller
     - ex) web.xml
+    ```
           <servlet>
               <servlet-name>dispatcher</servlet-name>
               <servlet-class>
@@ -264,8 +265,9 @@ Section 11. Web Applications With Spring MVC
               <servlet-name>dispatcher</servlet-name>
               <url-pattern>/spring-mvc/*</url-pattern>
           </servlet-mapping>
-
+          ```
     - ex) todo-servlet.xml
+    ```
       <beans xmlns="http://www.springframework.org/schema/beans"
         xmlns:context="http://www.springframework.org/schema/context"
         xmlns:mvc="http://www.springframework.org/schema/mvc"
@@ -277,12 +279,13 @@ Section 11. Web Applications With Spring MVC
         <context:component-scan base-package="com.in28minutes" />
         <mvc:annotation-driven /> 
       </beans>
-
+```
   - Controller
     - @Controller : MVC중 Controller 의미
     - @RequestMapping(value="url") : HTTP 요청중 url 매핑됨.
     - @ResponseBody : 직접 응답하기위한 annotation
       - ex) web.xml
+      ```
         LoginController.java
         @Controller
         public class LoginController {
@@ -292,12 +295,13 @@ Section 11. Web Applications With Spring MVC
             return "Hello World";
           }
         }
-
+```
       - ex) URL = localhost:8080/spring-mvc/login
         -> Dispatcher Servlet -> /login -> LoginController
         -> sayHello() -> return "Hello World" to Dispatcher 
 
       - ex) web.xml
+      ```
         ...
           @RequestMapping(value="/login")
           @ResponseBody
@@ -306,10 +310,11 @@ Section 11. Web Applications With Spring MVC
           }
         }
         => HTML Response "Hello World"
-
+        ```
   - View (JSP)
     - View Resolver 설정 : jsp 찾을 수 있도록, prefix, suffix 추가가 끝
       - ex) todo-servlet.xml
+      ```
         <beans xmlns="http://www.springframework.org/schema/beans"
           xmlns:context="http://www.springframework.org/schema/context"
           xmlns:mvc="http://www.springframework.org/schema/mvc"
@@ -330,7 +335,7 @@ Section 11. Web Applications With Spring MVC
           </bean>
           <mvc:annotation-driven /> 
         </beans>
-
+```
   - sl4j 설정
     - pom.xml에 dependency 추가
       - <dependency>
@@ -352,11 +357,14 @@ Section 11. Web Applications With Spring MVC
       - @RequestMapping(value="/login", method=RequestMethod.GET)
       - @RequestMapping(value="/login", method=RequestMethod.POST)
     - @RequestParam : Request의 파라미터 값 가져오는 방법
-      - ex) @RequestMapping(value="/login", method=RequestMethod.POST)
+      - ex) 
+```
+            @RequestMapping(value="/login", method=RequestMethod.POST)
               public String handleLoginRequest(@RequestParam String name, @RequestParam String password, ModelMap model) {
               model.put("name", name);
               model.put("password", password);
 
               return "welcome";
             }
+            ```
     - RequestParam으로 request의 파라미터 값을 가져와서 ModelMap에 put해주면 JSP에서 ${키}로 동일하게 사용 가능!!
