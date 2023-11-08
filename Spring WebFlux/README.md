@@ -73,13 +73,16 @@
       - Reactive Programming의 기반.
       - Specification: 4개의 Interface! (Publisher, Subscriber, Subscription, Processor)
         - Publisher : Method 1개 
+          - 데이터를 생산하는 생산자.
+          - 생산된 데이터를 소비할 소비자가(subscriber)가 등록(subscribe)될 때까지 아무일도 일어나지 않음
           - ```
             public interface Publisher< T > {
               public void subscribe(Subscriber<? super T> s);
             }
             ```
-          - Publiser represents the DataSource (ex. DB, RemoteService)
+          - Publisher represents the DataSource (ex. DB, RemoteService)
         - Subscriber : Method 4개 
+          - 데이터를 소비하는 소비자.
           - ```
             public interface Subscriber< T > {
               public void onSubscribe(Subscription s);
@@ -108,6 +111,15 @@
             ```
           - Processor behaves as a publisher and also as a subscriber.
           - 잘 사용하지는 않음
+        - Ex) publisher, subscriber 구분 예제
+          - ```
+            Flux<Integer> flux = Flux.range(1, 10);
+            flux.subscribe(number -> System.out.println(number));
+            ```
+          - publisher = 생산자 = Flux 클래스
+          - operator = 연산자 = range
+          - subscriber = 데이터를 소비하는 소비자 = System.out.println
+        -  ![image](https://github.com/jychoi9712/Spring/assets/39684556/0963d747-a426-4580-be38-2204b479af6e)
         - Success Scenario
           - ![image](https://github.com/jychoi9712/Spring/assets/39684556/fda77572-e098-4137-8fef-540b5ec618de)
           - 1. Subscriber initiating the request by invoking the subscribe method of the publisher
@@ -172,3 +184,43 @@
               }
           }
           ```
+      - Flux.fromIterable 뒤에 .log()를 추가하면 subscriber-publisher 간의 모든 events가 출력
+        - ```
+        16:55:20.675 [main] INFO reactor.Flux.Iterable.1 - | onSubscribe([Synchronous Fuseable] FluxIterable.IterableSubscription)
+        16:55:20.678 [main] INFO reactor.Flux.Iterable.1 - | request(unbounded)
+        16:55:20.678 [main] INFO reactor.Flux.Iterable.1 - | onNext(dyonyon)
+        Flux Name is : dyonyon
+        16:55:20.691 [main] INFO reactor.Flux.Iterable.1 - | onNext(sojoong)
+        Flux Name is : sojoong
+        16:55:20.691 [main] INFO reactor.Flux.Iterable.1 - | onNext(young)
+        Flux Name is : young
+        16:55:20.692 [main] INFO reactor.Flux.Iterable.1 - | onComplete()
+        ```
+          - requst(unbound)는 default 값으로 모든 데이터를 달라고 요청하는 것
+      - Flux, Mono를 사용한 Reactive code의 Test는 StepVerifier를 사용하여 Unit Test 진행
+        - ex) Flux Unit Test 예제
+          ```
+          class FluxAndMonoGeneratorServiceTest {
+
+            FluxAndMonoGeneratorService fluxAndMonoGeneratorService = new FluxAndMonoGeneratorService();
+
+            @Test
+            void namesFlux() {
+
+                //given
+
+                //when
+                var stringFlux = fluxAndMonoGeneratorService.namesFlux();
+
+                //then
+                StepVerifier.create(stringFlux)
+                //.expectNext("dyonyon","sojoong","young")
+                //.expectNextCount(3)  
+                //위에서 Next로 데이터를 사용했기 때문에 남은 데이터 개수는 0이 된다.
+                .expectNext("dyonyon")
+                .expectNextCount(2)
+                .verifyComplete();
+            }
+          }
+          ```
+          - Create function call basically takes care of invoking the subscribe call which automatically triggers the publisher to send the events.
