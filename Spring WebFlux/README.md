@@ -19,5 +19,5 @@
       - Scale up automatically based on the load
     - Restful API using Spring Boot/MVC
       - ![스크린샷 2023-11-08 094015](https://github.com/jychoi9712/Spring/assets/39684556/b0f63c00-09d7-42a8-a909-90cb499f223c)
-      <img src="https://github.com/jychoi9712/Spring/assets/39684556/b0f63c00-09d7-42a8-a909-90cb499f223c" width="700" height="370">
+      <img src="https://github.com/jychoi9712/Spring/assets/39684556/b0f63c00-09d7-42a8-a909-90cb499f223c" width="300" height="200">
 
