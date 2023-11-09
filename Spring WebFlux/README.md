@@ -223,4 +223,338 @@
             }
           }
           ```
-          - Create function call basically takes care of invoking the subscribe call which automatically triggers the publisher to send the events.
+          - StepVerifier.Create()은 subscribe를 자동으로 호출해준다.
+      - Transforming Data Using Operators in Project Reactor
+        - map() 연산자
+          - element의 form을 변환함. Java Streams API의 map()과 유사함
+          - ex) map() 연산자 예제
+          ```
+            public Flux<String> namesFlux_map(){
+                return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                        .map(String::toUpperCase)     // 방법 1. 함수형 인터페이스
+                        //.map(s -> s.toUpperCase())  // 방법 2. 람다식
+                        .log();
+            }
+          ```
+          - Reactive Streams 은 멱등(Immutable)이다.
+            - ex) Immutable 예제
+            ```
+                  public Flux<String> namesFlux_immutability(){
+                    var nameFlux = Flux.fromIterable(List.of("dyonyon","sojoong","young"));
+
+                    nameFlux.map(String::toUpperCase);
+
+                    return nameFlux;
+                  }
+                  // 출력 "dyonyon","sojoong","young"
+            ```
+            ```
+                // Flux.java map함수 구현체
+                // 전달 받은 Flux를 변경하는 것이 아닌 new한 Flux를 return.
+                // 즉 map함수를 호출한 Flux는 변경되지 않음
+                public final <V> Flux<V> map(Function<? super T, ? extends V> mapper) {
+                  if (this instanceof Fuseable) {
+                    return onAssembly(new FluxMapFuseable<>(this, mapper));
+                  }
+                  return onAssembly(new FluxMap<>(this, mapper));
+                }
+            ```
+        - filter() 연산자
+          - element를 filter하는 기능. Java Streams API의 filter()와 유사함
+          - ex) filter() 연산자 예제
+          ```
+            public Flux<String> namesFlux_filter(int stringLength){
+                return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                        .filter(s->s.length()>stringLength)
+                        .log();
+            }
+
+            // 출력 "dyonyon","sojoong"
+          ```
+          - ex) filter(), map() 연산자 예제
+          ```
+            public Flux<String> namesFlux_filter_map(int stringLength){
+                return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                        .filter(s->s.length()>stringLength)
+                        .map(s->s.length()+"-"+s)
+                        .log();
+            }
+
+            // 출력 "7-dyonyon", "7-sojoong"
+          ```
+        - flatMap() 연산자
+          - Transforms one source element to Flux of 1 to N elements
+            - ex) "ALEX" -> Flux.just("A","L","E","X")
+          - Reactive Type(Flux or Mono) 를 반환하는 Transformation일 때 사용
+          - ex) flatMap() 연산자 예제
+          ```
+              public Flux<String> namesFlux_flatMap(int stringLength){
+                  return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                          .filter(s->s.length()>stringLength)
+                          //.flatMap(s->splitString(s)) // 람다식
+                          .flatMap(this::splitString)   // 함수형 인터페이스
+                          .log();
+              }
+
+              //dyonyon -> Flux(d,y,o,n,y,o,n)
+              public Flux<String> splitString(String name){
+                  var charArray = name.split("");
+                  return Flux.fromArray(charArray);
+              }
+
+              // 출력 "d", "y", "o", "n", "y", "o", "n", "s", "o", "j", "o", "o", "n", "g"
+          ```
+          - ex) 비동기 async flatMap()
+          ```
+            // Service.java
+            public Flux<String> namesFlux_flatMap_async(int stringLength){
+                return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                        .filter(s->s.length()>stringLength)
+                        //.flatMap(s->splitString_withDelay(s))
+                        .flatMap(this::splitString_withDelay)
+                        .log();
+            }
+            
+            /// Test.java
+            @Test
+            void namesFlux_flatmap_async() {
+
+                //given
+                int stringLength = 5;
+
+                //when
+                var namesFlux = fluxAndMonoGeneratorService.namesFlux_flatMap_async(stringLength).log();
+
+                //then
+                StepVerifier.create(namesFlux)
+                        .expectNext("d", "y", "o", "n", "y", "o", "n", "s", "o", "j", "o", "o", "n", "g")
+                        .verifyComplete();
+
+            }
+
+            // 이 경우 random value에 따라 dyonyon이 먼저 리턴될 수도, sojoong이 먼저 리턴될 수도, 섞여서 리턴될 수도 있음!
+          ```
+            - *** flatMap의 비동기적 특성이며, 순서가 중요한 경우에는 flatMap을 사용할 수 없다. ***
+          - flatMap() in Mono
+            - 항상 Mono< T >를 반환함. Mono는 여러 개를 반환할 수 없으니 Mono List 하나롤 만들어 반환
+            - REST API call 혹은 비동기 기능 혹은 Mono를 return할 때 사용함
+            ```
+              public Mono<List<String>> namesMono_flatMap(int stringLength){
+                  return Mono.just("dyonyon")
+                          .map(String::toUpperCase)
+                          .filter(s->s.length()>stringLength)
+                          .flatMap(this::splitStringMono);
+                          //Mono<List of D,Y,O,N,Y,O,N
+              }
+              ...
+              public Mono<List<String>> splitStringMono(String name){
+                  var charArray = name.split("");
+                  var charList = List.of(charArray); // array -> list
+                  return Mono.just(charList);
+              }
+
+              //출력 : onNext([D, Y, O, N, Y, O, N])
+            ```
+          - flatMapMany() in Mono
+            - flatMap()과 동일, but Mono를 Flux로 변환하여 반환!
+            - ex) flatMapMany() 연산자 예제
+              ```
+                public Flux<String> namesMono_flatMapMany(int stringLength){
+                    return Mono.just("dyonyon")
+                            .map(String::toUpperCase)
+                            .filter(s->s.length()>stringLength)
+                            .flatMapMany(this::splitString);
+                }
+
+                public Flux<String> splitString(String name){
+                    var charArray = name.split("");
+                    return Flux.fromArray(charArray);
+                }
+              ```
+        - map() vs flatmap()
+          - map() : 
+            - 1 대 1 변형, T to V의 간단한 변형
+            - 간단한 동기(Synchronous) 변형
+            - Publisher(Reactive Types)를 반환하는 변형을 지원하지 않음
+          - flatmap() :
+            - 1 대 N 변형, 변형만 하는것이 아니라, Flux 혹은 Mono를 subscribes한 뒤 이를 평면화하여 다운스트림 operator에게 보냄
+            - 비동기(Asynchronous) 변형
+            - Flux 혹은 Mono를 반환하는 변형.
+        - concatMap() 연산자
+          - flatMap() 연산과 비슷, But Reactive Streams의 순서를 유지함!
+          - ex) concatMap() 연산자 예제
+          ```
+            public Flux<String> namesFlux_concatMap(int stringLength){
+                return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                        .filter(s->s.length()>stringLength)
+                        //.flatMap(s->splitString_withDelay(s))
+                        .concatMap(this::splitString_withDelay)
+                        .log();
+            }
+
+            // 출력 고정 dyonyon -> sojoong
+            // 순서가 먼저인 dyonyon이 순서가 보장되기 때문에 flatMap() 보다 소요시간이 길다.
+          ```
+        - transform() 연산자
+          - 타입을 다른 타입으로 변형할 때 사용
+          - 함수형 인터페이스 함수만 accept
+          - Function 을 추출하여 변수에 할당한 뒤 transform()을 사용하여 재사용가능
+          - Input&Output : Publisher(Flux or Mono)
+          - ex) transform() 연산자 예제
+          ```
+              public Flux<String> namesFlux_transform(int stringLength){
+                  Function<Flux<String>, Flux<String>> filterMap = name -> name.map(String::toUpperCase).filter(s->s.length()>stringLength);
+
+                  return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                          .transform(filterMap)
+                          .flatMap(this::splitString)
+                          .log();
+              }
+          ```
+        - defaultIfEmpty() & switchIfEmpty() 연산자
+          - DataSource에서 항상 data를 return해주지는 않음. onNext()가 없이 바로 onComplete()되는 경우.
+          - defaultIfEmpty()는 값이 없다면 String 인자를 return
+          - switchIfEmpty()는 값이 없다면 Flux 인자를 return
+          - 위 2가지 연산자를 통해서 default value를 operator에게 provide함
+          - ex) defaultIfEmpty() & switchIfEmpty() 연산자 예제
+          ```
+              public Flux<String> namesFlux_transform_default(int stringLength){
+                  Function<Flux<String>, Flux<String>> filterMap = name -> name.map(String::toUpperCase).filter(s->s.length()>stringLength).flatMap(this::splitString);
+
+                  return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                          .transform(filterMap)
+                          .defaultIfEmpty("default")
+                          .log();
+              }
+
+              public Flux<String> namesFlux_transform_switch(int stringLength){
+                  Function<Flux<String>, Flux<String>> filterMap = name -> name.map(String::toUpperCase).filter(s->s.length()>stringLength).flatMap(this::splitString);
+
+                  var defaultFlux = Flux.just("default!").transform(filterMap);
+
+                  return Flux.fromIterable(List.of("dyonyon","sojoong","young"))
+                          .transform(filterMap)
+                          .switchIfEmpty(defaultFlux)
+                          .log();
+              }
+          ```
+      - Combining Flux & Mono 연산자
+        - concat() & concatWith()
+          - Reactive Stream 2개를 1개로 결합하는데 사용
+          - concatenation of Reactive Stream은 순서대로 발생
+            - 처음 것이 subscribed되고 끝나야 두번째꺼 subscribed되고 끝남
+          - concat() : static method id Flux
+          - concatWith() : instance method in Flux and Mono
+          - ex) concat(), concatWith() 연산자 예제
+          ```
+              public Flux<String> explore_concat(){
+                  var abcFlux = Flux.just("A","B","C");
+                  var defFlux = Flux.just("D","E","F");
+
+                  return Flux.concat(abcFlux,defFlux).log();
+              }
+
+              public Flux<String> explore_concatWith(){
+                  var abcFlux = Flux.just("A","B","C");
+                  var defFlux = Flux.just("D","E","F");
+
+                  return abcFlux.concatWith(defFlux);
+              }
+              public Flux<String> explore_concatWith_Mono(){
+                  var aMono = Mono.just("A");
+                  var bMono = Mono.just("B");
+
+                  return aMono.concatWith(bMono);
+              }
+          ```
+        - merge() & mergeWith()
+          - Combine two publishers in to one
+          - 2개의 publisher가 동시에 subscribe하는 특징
+          - concat()은 순서대로 subscribe함을 기억!
+          - merge() : static method in Flux
+          - mergeWith() : instance method in Flux and Mono
+          - ex) merge(), mergeWith() 연산자 예제
+          ```
+            public Flux<String> explore_merge(){
+                var abcFlux = Flux.just("A","B","C").delayElements(Duration.ofMillis(100)); //A,B
+                var defFlux = Flux.just("D","E","F").delayElements(Duration.ofMillis(125)); //D,E
+
+                return Flux.merge(abcFlux,defFlux).log();
+            }
+
+            // 출력 : A D B E C F
+
+            public Flux<String> explore_mergeWith(){
+                var abcFlux = Flux.just("A","B","C").delayElements(Duration.ofMillis(100)); 
+                var defFlux = Flux.just("D","E","F").delayElements(Duration.ofMillis(125)); 
+
+                return abcFlux.mergeWith(defFlux).log();
+            }
+
+            // 출력 : A D B E C F
+
+            public Flux<String> explore_mergeWith_mono(){
+                var aMono = Mono.just("A"); //A
+                var bMono = Mono.just("B"); //B
+
+                return aMono.mergeWith(bMono).log();
+            }
+
+            // 출력 : A B
+          ```
+        - mergeSequential()
+          - Combine Two publishers (Flux) in to one
+          - 2개의 publisher가 동시에 subscribe하지만, merge는 순차적으로 진행
+          - ex) mergeSequential() 예제
+          ```
+            public Flux<String> explore_mergeSequential(){
+                var abcFlux = Flux.just("A","B","C")
+                        .delayElements(Duration.ofMillis(100)); //A,B
+                var defFlux = Flux.just("D","E","F")
+                        .delayElements(Duration.ofMillis(125)); //D,E
+
+                return Flux.mergeSequential(abcFlux,defFlux).log();
+            }
+          ```
+        - zip() & zipWith()
+          - 여러 Publisher를 하나도 압축할 때 사용
+          - zip() 
+            - Static method that's part of the Flux
+            - 2~8개의 publisher를 하나로 merge 할 때 사용
+          - zipWith()
+            - Instance method that's part of the Flux and Mono
+            - 2개의 publisher를 하나로 merge할 때 사용.
+            - Waits for all the publishers involved in the transformation to emit one element
+              - It continues until one of the publisher involved sends an Oncomplete event.
+          - ex) zip(), zipWith() 예제
+          ```
+              public Flux<String> explore_zip(){
+                  var abcFlux = Flux.just("A","B","C");
+                  var defFlux = Flux.just("D","E","F");
+
+                  return Flux.zip(abcFlux,defFlux,(first, second) -> first+second).log();  // AD, BE, CF
+              }
+
+              public Flux<String> explore_zip_1(){
+                  var abcFlux = Flux.just("A","B","C");
+                  var defFlux = Flux.just("D","E","F");
+                  var _123Flux = Flux.just("1","2","3");
+                  var _456Flux = Flux.just("4","5","6");
+
+                  return Flux.zip(abcFlux,defFlux,_123Flux,_456Flux).map(t4 -> t4.getT1()+t4.getT2()+t4.getT3()+t4.getT4()).log();  // AD, BE, CF
+              }
+
+              public Flux<String> explore_zipWith(){
+                  var abcFlux = Flux.just("A","B","C");
+                  var defFlux = Flux.just("D","E","F");
+
+                  return abcFlux.zipWith(defFlux,(first, second) -> first+second).log();  // AD, BE, CF
+              }
+
+              public Mono<String> explore_zipWith_Mono(){
+                  var aMono = Mono.just("A");
+                  var bMono = Mono.just("D");
+
+                  return aMono.zipWith(bMono).map(t2->t2.getT1()+t2.getT2()).log();  // AB
+              }
+          ```
