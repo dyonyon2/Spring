@@ -558,3 +558,9 @@
                   return aMono.zipWith(bMono).map(t2->t2.getT1()+t2.getT2()).log();  // AB
               }
           ```
+  - Section 4 : Spring WebFlux
+    - document : https://docs.spring.io/spring-framework/docs/5.0.0.RELEASE/spring-framework-reference/web-reactive.html
+      - 2가지 Type : Annotated Controllers & Functional EndPoints
+    - 강의에서 만들 MicroServices의 구조
+      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/4ee5ff70-8477-4545-9a18-f5e6013f0c84)
+    - 
