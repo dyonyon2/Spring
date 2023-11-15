@@ -563,4 +563,9 @@
       - 2가지 Type : Annotated Controllers & Functional EndPoints
     - 강의에서 만들 MicroServices의 구조
       - ![image](https://github.com/dyonyon2/Spring/assets/39684556/4ee5ff70-8477-4545-9a18-f5e6013f0c84)
-    - 
+    - 강의 프로젝트의 구조가 멀티 프로젝트 구조이므로 build.gradle을 수정해주지 않으면 오류 발생! 블로그에 에러 정리해 놓음
+      - https://blog.naver.com/dyonyon2/223263664037
+    - MongoDB가 설치되어있지 않으면 에러 발생할 것임. MongoDB 설치도 블로그에 정리해 놓음
+      - https://blog.naver.com/dyonyon2/223265695024
+    - MongoDB 실행 : mongod
+    - MongoDB 쉘 연결 : mongosh
