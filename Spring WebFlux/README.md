@@ -105,9 +105,9 @@
           - cancel() : once the app decides that it does not require any more data, then it sends a cancel request to the data source.
         - Processor : 
           - ```
-          public interface Processor<T,R> extends Subscriber<T>, Publisher<R> {
+              public interface Processor<T,R> extends Subscriber<T>, Publisher<R> {
 
-            }
+              }
             ```
           - Processor behaves as a publisher and also as a subscriber.
           - 잘 사용하지는 않음
@@ -561,11 +561,455 @@
   - Section 4 : Spring WebFlux
     - document : https://docs.spring.io/spring-framework/docs/5.0.0.RELEASE/spring-framework-reference/web-reactive.html
       - 2가지 Type : Annotated Controllers & Functional EndPoints
-    - 강의에서 만들 MicroServices의 구조
-      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/4ee5ff70-8477-4545-9a18-f5e6013f0c84)
-    - 강의 프로젝트의 구조가 멀티 프로젝트 구조이므로 build.gradle을 수정해주지 않으면 오류 발생! 블로그에 에러 정리해 놓음
-      - https://blog.naver.com/dyonyon2/223263664037
-    - MongoDB가 설치되어있지 않으면 에러 발생할 것임. MongoDB 설치도 블로그에 정리해 놓음
-      - https://blog.naver.com/dyonyon2/223265695024
-    - MongoDB 실행 : mongod
-    - MongoDB 쉘 연결 : mongosh
+    - Project
+      - 강의에서 만들 MicroServices의 구조
+        - ![image](https://github.com/dyonyon2/Spring/assets/39684556/4ee5ff70-8477-4545-9a18-f5e6013f0c84)
+      - Settings
+        - 강의 프로젝트의 구조가 멀티 프로젝트 구조이므로 build.gradle을 수정해주지 않으면 오류 발생! 블로그에 에러 정리해 놓음
+          - https://blog.naver.com/dyonyon2/223263664037
+        - MongoDB가 설치되어있지 않으면 에러 발생할 것임. MongoDB 설치도 블로그에 정리해 놓음
+          - https://blog.naver.com/dyonyon2/223265695024
+        - MongoDB 실행 : mongod
+        - MongoDB 쉘 연결 : mongosh
+      - 간단한 Non Blocking API Flux & Mono
+        - ex) localhost:8080/flux 접속시 API return 확인
+          ```
+          @RestController
+          public class FluxMonoController {
+
+
+              @GetMapping("/flux")
+              public Flux<Integer> flux(){
+                  return Flux.just(1,2,3)
+                          .log();
+              }
+
+              @GetMapping("/mono")
+              public Mono<String> helloWorldMono(){
+                  return Mono.just("hello-world");
+              }
+          }
+          ```
+      - Streaming Endpoint Using Spring WebFlux
+        - Streaming Endpoint란 새로운 데이터가 도착할 때 클라이언트에게 지속적으로 업데이트를 보내는 엔드포인트
+        - Server Sent Events(SSE)와 비슷한 개
+        - ex) 1초마다 OnNext로 1 증가한 값을 계속해서 보내줌
+          ```
+            @RestController
+            public class FluxMonoController {
+              ...
+              @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+              public Flux<Long> stream(){
+                  return Flux.interval(Duration.ofSeconds(1))
+                          .log();
+            }
+          ```
+      - Automated Testing Using JUnit5
+        - Automated Test는 좋은 소프트웨어 제공을 위해서는 꼭 필요함
+        - Integration Test와 Unit Test를 다룰 것임
+        - Integration Test
+          - Integration Tests는 Application의 end to end의 테스트
+          - ![image](https://github.com/dyonyon2/Spring/assets/39684556/4361f891-c465-429e-89c2-f0cf66d74762)
+        - Unit Test
+          - Unit test는 관심 있는 클래스와 메서드만 테스트
+          - ![image](https://github.com/dyonyon2/Spring/assets/39684556/24306624-6c25-4b0d-93a6-407961bf2b14)
+          - ex) Flux 방식 3개, Mono, Stream
+            ```
+            @WebFluxTest(controllers = FluxMonoController.class)
+            public class FluxMonoControllerUnitTest {
+
+                @Autowired
+                WebTestClient webTestClient;
+
+                @MockBean
+                private MoviesInfoService moviesInfoServiceMock;
+
+                @Test
+                void flux() {
+
+                    webTestClient
+                            .get()
+                            .uri("/flux")
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            .expectBodyList(Integer.class)
+                            .hasSize(3);
+                }
+
+                @Test
+                void flux_approach2() {
+
+                    var flux = webTestClient
+                            .get()
+                            .uri("/flux")
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            .returnResult(Integer.class)
+                            .getResponseBody();
+
+                    StepVerifier.create(flux)
+                            .expectNext(1, 2, 3)
+                            .expectComplete();
+                }
+
+                @Test
+                void flux_approach3() {
+
+                    webTestClient
+                            .get()
+                            .uri("/flux")
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            .expectBodyList(Integer.class)
+                            .consumeWith(listEntityExchangeResult -> {
+                                var responseBody = listEntityExchangeResult.getResponseBody();
+                                assert (responseBody != null ? responseBody.size() : 0) ==3;
+                            });
+
+
+                }
+
+
+                /**
+                 * Copied from approach 2
+                 */
+                @Test
+                void stream() {
+
+                    var flux = webTestClient
+                            .get()
+                            .uri("/stream")
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            .returnResult(Integer.class)
+                            .getResponseBody();
+
+                    StepVerifier.create(flux)
+                            .expectNext(0, 1, 2)
+                            .thenCancel()
+                            .verify();
+                }
+
+
+                @Test
+                void mono() {
+
+                     webTestClient
+                            .get()
+                            .uri("/mono")
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            .expectBody(String.class)
+                            .consumeWith(stringEntityExchangeResult ->{
+                                var response = stringEntityExchangeResult.getResponseBody();
+                                assertEquals("hello-world", response);
+                            });
+
+                }
+            }
+            ```
+      - 데이터 만들기 MovieInfo 
+        - ex) domain/MovieInfo
+          ```
+            @Data
+            @NoArgsConstructor
+            @AllArgsConstructor
+            @Document
+            @Validated
+            public class MovieInfo {
+                @Id
+                private String movieInfoId;
+                @NotBlank(message = "movieInfo.name must be present")
+                private String name;
+                @NotNull
+                @Positive(message = "movieInfo.year must be a Positive Value")
+                private Integer year;
+
+                @NotNull
+                private List<@NotBlank(message = "movieInfo.cast must be present") String> cast;
+                private LocalDate release_date;
+            }
+          ```
+        - MongoDB 연결
+          - ReactiveMongoRepository< Table명 , id자료형 >를 상속하여 연결
+          - ex) repository/MovieInfoRepository
+            ```
+              public interface MovieInfoRepository extends ReactiveMongoRepository<MovieInfo, String> {
+
+                  Flux<MovieInfo> findByYear(Integer year);
+
+                  Mono<MovieInfo> findByName(String name);
+              }
+            ```
+          - MongoDB 설정
+            - ex) application.yml
+              ```
+                spring:
+                  profiles:
+                    active: local
+                ---
+                spring:
+                  config:
+                    activate:
+                      on-profile: local
+                  data:
+                    mongodb:
+                      host: localhost
+                      port: 27017
+                      database: local
+              ```
+          - MongoDB Test
+            - @DataMongoTest annotation을 사용하면 embedded MongoDB가 사용됨
+            - @ActiveProfiles("test") annotation을 사용하여 application.yml에 설정한 DB 주소를 안바라보도록 변경
+            - findall()과 같은 기본적인 sql 기능들이 ReactiveMongoRepository에 있음
+            - 비동기 방식이므로 그 뒤에 다른 작업에서 결과를 사용해야할 때는 block(), blockLast()를 사용하여 동기처럼 진행
+              - But Reactive Project에서는 Harmful! 되도록 테스트용으로만 사용
+            - ex) findAll, findById, findByYear, save, update, delete
+              ```
+                @DataMongoTest
+                @ActiveProfiles("test")
+                public class MoviesInfoRepositoryIntgTest {
+
+                    @Autowired
+                    MovieInfoRepository movieInfoRepository;
+
+                    @BeforeEach
+                    void setUp() {
+
+                        var movieinfos = List.of(new MovieInfo(null, "Batman Begins",
+                                        2005, List.of("Christian Bale", "Michael Cane"), LocalDate.parse("2005-06-15")),
+                                new MovieInfo(null, "The Dark Knight",
+                                        2008, List.of("Christian Bale", "HeathLedger"), LocalDate.parse("2008-07-18")),
+                                new MovieInfo("abc", "Dark Knight Rises",
+                                        2012, List.of("Christian Bale", "Tom Hardy"), LocalDate.parse("2012-07-20")));
+
+                        movieInfoRepository.saveAll(movieinfos)
+                                .blockLast();
+                    }
+
+                    @AfterEach
+                    void tearDown() {
+                        movieInfoRepository.deleteAll().block();
+                    }
+
+                    @Test
+                    void findAll() {
+
+                        var moviesFlux = movieInfoRepository.findAll().log();
+
+                        StepVerifier.create(moviesFlux)
+                                .expectNextCount(3)
+                                .verifyComplete();
+
+                    }
+
+                    @Test
+                    void findById() {
+
+                        var movieInfo = movieInfoRepository.findById("abc");
+
+                        StepVerifier.create(movieInfo)
+                                .assertNext(movieInfo1 -> {
+                                    assertEquals("Dark Knight Rises", movieInfo1.getName());
+                                });
+                    }
+
+                    @Test
+                    void saveMovieInfo() {
+
+                        var movieInfo = new MovieInfo(null, "Batman Begins1",
+                                2005, List.of("Christian Bale", "Michael Cane"), LocalDate.parse("2005-06-15"));
+
+                        var savedMovieInfo = movieInfoRepository.save(movieInfo);
+
+                        StepVerifier.create(savedMovieInfo)
+                                .assertNext(movieInfo1 -> {
+                                    assertNotNull(movieInfo1.getMovieInfoId());
+                                });
+
+                    }
+
+                    @Test
+                    void updateMovieInfo() {
+
+                        var movieInfo = movieInfoRepository.findById("abc").block();
+                        movieInfo.setYear(2021);
+
+                        var savedMovieInfo = movieInfoRepository.save(movieInfo);
+
+                        StepVerifier.create(savedMovieInfo)
+                                .assertNext(movieInfo1 -> {
+                                    assertNotNull(movieInfo1.getMovieInfoId());
+                                    assertEquals(2021, movieInfo1.getYear());
+                                });
+
+                    }
+
+                    @Test
+                    void deleteMovieInfo() {
+
+                        movieInfoRepository.deleteById("abc").block();
+
+                        var movieInfos = movieInfoRepository.findAll();
+
+                        StepVerifier.create(movieInfos)
+                                .expectNextCount(2)
+                                .verifyComplete();
+
+                    }
+
+                    @Test
+                    void findMovieInfoByYear() {
+
+                        var movieInfosFlux = movieInfoRepository.findByYear(2005).log();
+
+                        StepVerifier.create(movieInfosFlux)
+                                .expectNextCount(1)
+                                .verifyComplete();
+
+
+
+                    }
+
+                    @Test
+                    void findByName() {
+
+                        var movieInfosMono = movieInfoRepository.findByName("Batman Begins").log();
+
+                        StepVerifier.create(movieInfosMono)
+                                .expectNextCount(1)
+                                .verifyComplete();
+
+
+                    }
+                }
+
+              ```
+      - MovieInfo Controller와 Service 만들기
+        - @RestController가 붙은 controller에서 REST API를 받아 @PostMapping에서 받아서 처리하는 Service 호출. Service에서는 Repository를 불러와 DB에 add
+        - ex) MoviesInfoController
+          ```
+            @RestController
+            @RequestMapping("/v1")
+            @Slf4j
+            public class MoviesInfoController {
+
+                @Autowired
+                private  MoviesInfoService moviesInfoService;
+
+            //    public MoviesInfoController(MoviesInfoService moviesInfoService){
+            //        this.moviesInfoService = moviesInfoService;
+            //    }
+
+                @PostMapping("/movieinfos")
+                @ResponseStatus(HttpStatus.CREATED)
+                public Mono<MovieInfo> addMovieInfo(@RequestBody MovieInfo movieInfo){
+                    return moviesInfoService.addMovieInfo(movieInfo);
+                }
+
+                @GetMapping("/movieinfos/{id}")
+                public Mono<MovieInfo> getMovieInfoById(@PathVariable String id){
+                    return moviesInfoService.getMovieInfoById(id);
+                }
+
+            }
+          ```
+        - ex) MovieInfoService
+          ```
+            @Service
+            @Slf4j
+            public class MoviesInfoService {
+
+
+                private MovieInfoRepository movieInfoRepository;
+
+                public MoviesInfoService(MovieInfoRepository movieInfoRepository) {
+                    this.movieInfoRepository = movieInfoRepository;
+                }
+
+                public Mono<MovieInfo> addMovieInfo(MovieInfo movieInfo) {
+                    log.info("addMovieInfo : {} " , movieInfo );
+                    return movieInfoRepository.save(movieInfo)
+                            .log();
+                }
+
+                public Mono<MovieInfo> getMovieInfoById(String id) {
+                    return movieInfoRepository.findById(id);
+                }
+            }
+
+          ```
+        - ex) 위 addMovieInfo Integration Test
+          ```
+            @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+            @ActiveProfiles("test")
+            @AutoConfigureWebTestClient
+            public class MovieInfoControllerIntgTest {
+
+                @Autowired
+                private WebTestClient webTestClient;
+
+                @Autowired
+                private MovieInfoRepository movieInfoRepository;
+
+                static String MOVIES_INFO_URL = "/v1/movieinfos";
+
+                @BeforeEach
+                void setUp() {
+                    var movieinfos = List.of(new MovieInfo(null, "Batman Begins",
+                                    2005, List.of("Christian Bale", "Michael Cane"), LocalDate.parse("2005-06-15")),
+                            new MovieInfo(null, "The Dark Knight",
+                                    2008, List.of("Christian Bale", "HeathLedger"), LocalDate.parse("2008-07-18")),
+                            new MovieInfo("abc", "Dark Knight Rises",
+                                    2012, List.of("Christian Bale", "Tom Hardy"), LocalDate.parse("2012-07-20")));
+
+                    movieInfoRepository
+                            .deleteAll()
+                            .thenMany(movieInfoRepository.saveAll(movieinfos))
+                            .blockLast();
+                }
+                @Test
+                void addNewMovieInfo() {
+
+                    var movieInfo = new MovieInfo(null, "Batman Begins",
+                            2005, List.of("Christian Bale", "Michael Cane"), LocalDate.parse("2005-06-15"));
+                    webTestClient
+                            .post()
+                            .uri(MOVIES_INFO_URL)
+                            .bodyValue(movieInfo)
+                            .exchange()
+                            .expectStatus()
+                            .isCreated()
+                            .expectBody(MovieInfo.class)
+                            .consumeWith(movieInfoEntityExchangeResult -> {
+                                var savedMovieInfo = movieInfoEntityExchangeResult.getResponseBody();
+                                assert Objects.requireNonNull(savedMovieInfo).getMovieInfoId() != null;
+
+                            });
+                }
+
+                @Test
+                void getMovieInfoById() {
+                    var id = "abc";
+                    webTestClient
+                            .get()
+                            .uri(MOVIES_INFO_URL + "/{id}", id)
+                            .exchange()
+                            .expectStatus()
+                            .is2xxSuccessful()
+                            /*.expectBody(MovieInfo.class)
+                            .consumeWith(movieInfoEntityExchangeResult -> {
+                                var movieInfo = movieInfoEntityExchangeResult.getResponseBody();
+                                assert movieInfo != null;
+                            })*/
+                            .expectBody()
+                            .jsonPath("$.name").isEqualTo("Dark Knight Rises");
+
+                }
+              }
+          ```
