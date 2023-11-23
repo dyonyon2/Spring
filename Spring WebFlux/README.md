@@ -1013,3 +1013,162 @@
                 }
               }
           ```
+
+        - MovieInfo 도메인 Validation 추가 (Bean Validation)
+          - ex) @NotBlank, @Positive, @NotNull annotation 활용
+          ```
+            @Data
+            @NoArgsConstructor
+            @AllArgsConstructor
+            @Document
+            @Validated
+            public class MovieInfo {
+                @Id
+                private String movieInfoId;
+                @NotBlank(message = "movieInfo.name must be present")
+                private String name;
+                @NotNull
+                @Positive(message = "movieInfo.year must be a Positive Value")
+                private Integer year;
+
+                @NotNull
+                private List<@NotBlank(message = "movieInfo.cast must be present") String> cast;
+                private LocalDate release_date;
+            }
+          ```
+        - Global Error Handler 구현
+          - ex)
+            ```
+              @ControllerAdvice
+              @Slf4j
+              public class GlobalErrorHandler {
+
+                  @ExceptionHandler(WebExchangeBindException.class)
+                  public ResponseEntity<String> handleRequestBodyError(WebExchangeBindException ex){
+                      log.error("Exception caught in handleRequestBodyError :  {} " ,ex.getMessage(),  ex);
+                      var error = ex.getBindingResult().getAllErrors().stream()
+                              .map(DefaultMessageSourceResolvable::getDefaultMessage)
+                              .sorted()
+                              .collect(Collectors.joining(","));
+                      log.error("errorList : {}", error);
+                      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                  }
+
+                  @ExceptionHandler(MovieInfoNotfoundException.class)
+                  public ResponseEntity<String> handleMovieInfoNotfoundException(MovieInfoNotfoundException ex){
+                      log.error("Exception caught in handleMovieInfoNotfoundException :  {} " ,ex.getMessage(),  ex);
+                      return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+                  }
+
+              }
+            ```
+        - ResponseEntity 추가
+          - ResponseStatus와 같은 응답이 없으면 Default로 200응답이 Response됨
+          - Mono 혹은 Flux도 포함하여 Response할 수 있음
+            - ex) 
+            ```
+              @PutMapping("/movieinfos/{id}")
+              public Mono<MovieInfo> updateMovieInfo(@RequestBody MovieInfo movieInfo, @PathVariable String id) {
+                  return moviesInfoService.updateMovieInfo(movieInfo, id);
+              }
+
+              // 위 응답을 ResponseEntity를 사용하여 변경
+
+              @PutMapping("/movieinfos/{id}")
+              public Mono<ResponseEntity<MovieInfo>> updateMovieInfo(@RequestBody MovieInfo movieInfo, @PathVariable String id) {
+
+                  var updatedMovieInfoMono =  moviesInfoService.updateMovieInfo(movieInfo, id);
+                  return updatedMovieInfoMono
+                          .map(movieInfo1 -> ResponseEntity.ok()
+                                  .body(movieInfo1))
+                          .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+
+              }
+            ```
+        - @RequestParam 설정
+          - ex) 
+          ```
+            @GetMapping("/movieinfos")
+            public Flux<MovieInfo> getAllMovieInfos(@RequestParam(value = "year", required = false) Integer year) {
+
+                log.info("year : {} " , year);
+                if(year!=null ){
+                    return moviesInfoService.getMovieInfoByYear(year).log();
+                }
+                return moviesInfoService.getAllMovieInfos();
+            }
+          ```
+          - 위 Controller 내 기능 Integration Test
+          ```
+              @Test
+              void getMovieInfoByYear() {
+                  var uri = UriComponentsBuilder.fromUriString(MOVIES_INFO_URL)
+                          .queryParam("year", 2005)
+                          .buildAndExpand().toUri();
+
+                  webTestClient
+                          .get()
+                          .uri(uri)
+                          .exchange()
+                          .expectStatus()
+                          .is2xxSuccessful()
+                          .expectBodyList(MovieInfo.class)
+                          .hasSize(1);
+              }
+          ```
+    - *** How Netty works with Spring WebFlux ***
+      - application.yml에서 logging level을 debug로 수정 후 진행
+      - 1. Application 시작
+        - Started MoviesInfoServiceApplication in 4.287 seconds 로그 확인
+        2. POST 전송
+        - http://localhost:8080/v1/movieinfos {"movieInfoId":null, "name": "Dark Knight Rises", "year":2012,"cast":["Christian Bale", "Tom Hardy"],"release_date": "2012-07-20"}
+        3. Connection 확인
+        - [ctor-http-nio-3] New http connection, requesting read 로그 확인
+          - Netty 쓰레드가 처리
+        - [ctor-http-nio-3] Initialized pipeline DefaultChannelPipeline{(reactor.left.httpCodec = io.netty.handler.codec.http.HttpServerCodec), (reactor.left.httpTrafficHandler = reactor.netty.http.server.HttpTrafficHandler), (reactor.right.reactiveBridge = reactor.netty.channel.ChannelOperationsHandler)}
+        - [ctor-http-nio-3] HTTP POST "/v1/movieinfos"
+        - [ctor-http-nio-3] Mapped to com.reactivespring.controller.MoviesInfoController#addMovieInfo(MovieInfo)
+        - [ctor-http-nio-3] Decoded [MovieInfo(movieInfoId=null, name=Dark Knight Rises, year=2012, cast=[Christian Bale, Tom Hardy], rel (truncated)...]
+        - [ntLoopGroup-3-3] Opened connection [connectionId{localValue:3, serverValue:3}] to localhost:27017
+          - 지금부터 이벤트 루프 그룹 쓰레드가 처리. ctor-http-nio-3 쓰레드는 다른 동작 실행(비동기)
+        - [ntLoopGroup-3-3] Sending command '{"insert": ...}
+        - [ntLoopGroup-3-3] onNext(MovieInfo(movieInfoId=
+        - [ntLoopGroup-3-3] onComplete()
+          - 데이터 insert 이후 return
+        - [ctor-http-nio-3] Completed 201 CREATED
+          - 이전 Netty 쓰레드가 받아서 다시 처리
+        - [ctor-http-nio-3] Last HTTP packet was sent, terminating the channel
+    - *** How does Netty handle the Request *** 
+      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/f6a26604-1591-4da5-9abb-7e8cc4b28951)
+      - Channel은 Channel Handler를 가지고 있다.
+        - Channel Handler
+          - Client Connection을 Accept
+          - Network로부터 Byte를 읽어서 Java Object로 변환
+          - Data를 Client로 write
+      - Netty는 Event Loop Model을 사용하여 Connection들을 Non Blocking Fashion으로 처리한다.
+        - EventLoop는 하나의 Thread로 동작하며, NodeJS와 동일한 패턴이다.
+        - Requewst를 처리하는 EventLoop의 개수는 서버의 코어 개수와 동일
+        - 여러 EventLoop들이 모여 EventLoopGroup을 이룸
+      - How Channel and EventLoop linked?
+        - Channel이 생성되면 하나의 EventLoop에 등록된다
+        - EventLoop는 채널의 lifetime 동안 일어나는 event들을 처리함
+      - Channel Lifecycle
+        - ![image](https://github.com/dyonyon2/Spring/assets/39684556/3381947a-1773-4ac0-8d75-c7c404cd2758)
+      - 이 모든 것을 Spring Webflux가 알아서 처리해준다.
+      - How Netty handles the request?
+        - Netty는 2개의 EventLoopGrouop을 가지고 있다.
+          - Accept Connection & Create Channel
+          - Handle the Channel
+        - ![image](https://github.com/dyonyon2/Spring/assets/39684556/9d9a92b9-e88c-42b2-aecf-ab344d7e3525)
+    - *** Functional Web Module in Spring WebFlux *** 
+      - Functional Web 모듈은 Spring WebFlux 내에서 RESTFUL API 구축을 위해 사용하는 프로그래밍 모델
+        - https://docs.spring.io/spring-framework/docs/5.0.0.RELEASE/spring-framework-reference/web-reactive.html#webflux-fn 에서 1.5 Functional Endpoints 참고        
+        - Lambdas, Method References, Functional Interfaces 사용
+        - ![image](https://github.com/dyonyon2/Spring/assets/39684556/91ceaf2d-e124-42f3-a41f-a26142b32da6)
+      - 장점
+        - 모든 RESTFUL API들이 하나의 파일에서 configured된다.(다른 방법들은 각 클래스 파일에 퍼져있음)
+        - 클래스와 메소드를 분리할 필요가 없어서 code가 가볍다
+      - Challenges:
+        - Functional Programming에 대한 지식이 필요
+        - Bean validation와 예외처리가 다름.
+      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/18ca6dbf-bcac-49ef-bae2-0782ff06147e)
