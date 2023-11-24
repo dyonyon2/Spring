@@ -1172,3 +1172,175 @@
         - Functional Programming에 대한 지식이 필요
         - Bean validation와 예외처리가 다름.
       - ![image](https://github.com/dyonyon2/Spring/assets/39684556/18ca6dbf-bcac-49ef-bae2-0782ff06147e)
+  - Movies-Review-Service by Functional Web 
+    - *** Functional Web Module in Spring WebFlux *** 
+      - Functional Web 모듈은 Spring WebFlux 내에서 RESTFUL API 구축을 위해 사용하는 프로그래밍 모델
+        - https://docs.spring.io/spring-framework/docs/5.0.0.RELEASE/spring-framework-reference/web-reactive.html#webflux-fn 에서 1.5 Functional Endpoints 참고        
+        - Lambdas, Method References, Functional Interfaces 사용
+        - ![image](https://github.com/dyonyon2/Spring/assets/39684556/91ceaf2d-e124-42f3-a41f-a26142b32da6)
+      - 장점
+        - 모든 RESTFUL API들이 하나의 파일에서 configured된다.(다른 방법들은 각 클래스 파일에 퍼져있음)
+        - 클래스와 메소드를 분리할 필요가 없어서 code가 가볍다
+      - Challenges:
+        - Functional Programming에 대한 지식이 필요
+        - Bean validation와 예외처리가 다름.
+      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/18ca6dbf-bcac-49ef-bae2-0782ff06147e)
+    - Router를 통해 API 처리
+      - ex) helloworld 처리
+      ```
+        @Configuration
+        public class ReviewRouter {
+
+            @Bean
+            public RouterFunction<ServerResponse> reviewsRoute(ReviewsHandler reviewsHandler) {
+                return route()
+                        .GET("/v1/helloworld", (request -> ServerResponse.ok().bodyValue("HelloWorld")))
+                        .build();
+            }
+        }
+      ```
+      - ex) 공통된 url API를 nest로 그룹 처리
+      ```
+        @Configuration
+        public class ReviewRouter {
+
+            @Bean
+            public RouterFunction<ServerResponse> reviewsRoute(ReviewsHandler reviewsHandler) {
+                return route()
+                        .nest(path("/v1/reviews"), builder ->
+                                builder
+                                        .GET("", reviewsHandler::getReviews)
+                                        .POST("", reviewsHandler::addReview)
+                                        .PUT("/{id}", reviewsHandler::updateReview)
+                                        .DELETE("/{id}", reviewsHandler::deleteReview)
+                                        .GET("/stream", reviewsHandler::getReviewsStream))
+                        .GET("/v1/helloworld", (request -> ServerResponse.ok().bodyValue("HelloWorld")))
+                        .GET("/v1/greeting/{name}", (request -> ServerResponse.ok().bodyValue("hello " + request.pathVariable("name"))))
+                        //  .GET("/v1/reviews",reviewsHandler::getReviews)
+                       // .POST("/v1/reviews", reviewsHandler::addReview)
+                        .build();
+            }
+        }
+      ```
+      - ex) Router로 받은 API 상세 처리
+      ```
+        @Component
+        @Slf4j
+        public class ReviewsHandler {
+            private ReviewReactiveRepository reviewReactiveRepository;
+            //private ReviewValidator reviewValidator;
+
+            Sinks.Many<Review> reviewsSink = Sinks.many().replay().latest();
+
+            @Autowired
+            private Validator validator;
+
+            public ReviewsHandler(ReviewReactiveRepository reviewReactiveRepository) {
+                this.reviewReactiveRepository = reviewReactiveRepository;
+            }
+
+         /*    public ReviewsHandler(ReviewReactiveRepository reviewReactiveRepository, ReviewValidator reviewValidator) {
+                this.reviewReactiveRepository = reviewReactiveRepository;
+                this.reviewValidator = reviewValidator;
+            }*/
+
+
+            static Mono<ServerResponse> notFound = ServerResponse.notFound().build();
+
+
+            public Mono<ServerResponse> getReviews(ServerRequest serverRequest) {
+                var movieInfoId = serverRequest.queryParam("movieInfoId");
+                if (movieInfoId.isPresent()) {
+                    var reviews = reviewReactiveRepository.findReviewsByMovieInfoId(Long.valueOf(movieInfoId.get()));
+                    return buildReviewsResponse(reviews);
+                } else {
+                    var reviews = reviewReactiveRepository.findAll();
+                    return buildReviewsResponse(reviews);
+                }
+            }
+
+            private Mono<ServerResponse> buildReviewsResponse(Flux<Review> reviews) {
+                return ServerResponse.ok()
+                        .body(reviews, Review.class);
+            }
+
+            public Mono<ServerResponse> addReview(ServerRequest serverRequest) {
+
+                return serverRequest.bodyToMono(Review.class)
+                        .doOnNext(this::validate)
+                        .flatMap(review -> reviewReactiveRepository.save(review))
+                        .doOnNext(review -> {
+                            reviewsSink.tryEmitNext(review);
+                        })
+                        .flatMap(savedReview ->
+                                ServerResponse.status(HttpStatus.CREATED)
+                                        .bodyValue(savedReview));
+            }
+
+            private void validate(Review review) {
+                Errors errors = new BeanPropertyBindingResult(review, "review");
+               /* reviewValidator.validate(review, errors);
+                if (errors.hasErrors()) {
+                    var errorMessage = errors.getAllErrors()
+                            .stream()
+                            .map(error -> error.getCode() + " : " + error.getDefaultMessage())
+                            .sorted()
+                            .collect(Collectors.joining(", "));
+                    log.info("errorMessage : {} ", errorMessage);
+                    throw new ReviewDataException(errorMessage);
+                }*/
+
+                var constraintViolations = validator.validate(review);
+                log.info("constraintViolations : {} ", constraintViolations);
+                if (constraintViolations.size() > 0) {
+                    var errorMessage = constraintViolations.stream()
+                            .map(ConstraintViolation::getMessage)
+                            .sorted()
+                            .collect(Collectors.joining(", "));
+                    log.info("errorMessage : {} ", errorMessage);
+                    throw new ReviewDataException(errorMessage);
+                }
+            }
+
+            public Mono<ServerResponse> updateReview(ServerRequest serverRequest) {
+
+                var reviewId = serverRequest.pathVariable("id");
+
+                var existingReview = reviewReactiveRepository.findById(reviewId);
+                //.switchIfEmpty(Mono.error(new ReviewNotFoundException("Review not Found for the given Review Id")));
+
+                return existingReview
+                        .flatMap(review -> serverRequest.bodyToMono(Review.class)
+                                .map(reqReview -> {
+                                    review.setComment(reqReview.getComment());
+                                    review.setRating(reqReview.getRating());
+                                    return review;
+                                })
+                                .flatMap(reviewReactiveRepository::save)
+                                .flatMap(savedReview ->
+                                        ServerResponse.status(HttpStatus.OK)
+                                                .bodyValue(savedReview)))
+                        .switchIfEmpty(notFound);
+
+
+            }
+
+            public Mono<ServerResponse> deleteReview(ServerRequest serverRequest) {
+                var reviewId = serverRequest.pathVariable("id");
+                return reviewReactiveRepository.findById(reviewId)
+                        .flatMap(review -> reviewReactiveRepository.deleteById(reviewId))
+                        .then(ServerResponse.noContent().build());
+
+            }
+
+            public Mono<ServerResponse> getReviewsStream(ServerRequest serverRequest) {
+                return ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_NDJSON)
+                        .body(reviewsSink.asFlux(), Review.class)
+                        .log();
+
+
+            }
+        }
+
+      ```
