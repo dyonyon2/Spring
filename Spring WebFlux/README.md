@@ -1344,3 +1344,100 @@
         }
 
       ```
+  - Movies Service - Rest Service connects the MovieInfo and MovieReview Service
+    - Web Client를 사용하여 기존 2가지 서비스들을 비동기 방식으로 상호작용할 것임
+      - ![image](https://github.com/dyonyon2/Spring/assets/39684556/b19441c0-61fe-4e81-a299-ac9c6e705cac)
+    - WebClient란?
+      - Reactive non-blocking Rest Client이며, funcational style API를 사용한다.
+      - 다른 서비스들과 비동기 방식의 상호작용을 가능케한다.
+      - https://docs.spring.io/spring-framework/docs/5.0.0.RELEASE/spring-framework-reference/web-reactive.html#webflux-client 1.7Web Client
+    - WebClient 구현
+      - Movies Service가 WebClient로 사용자와 Rest API 통신을 하면서, Mono/Flux를 반환해준다. 이 Mono/Flux는 각 서비스인 Movie 정보와 Review 정보를 가지고 있는 Mono를 반환하는 것임. 사용자의 요청을 먼저 받고 WebClient를 사용하여 각 서비스에 retrieve()와 같은 함수를 사용하여 서비스마다 필요한 정보를 받아서 그것을 하나의 Mono/Flux에 세팅하여 return 해주는 방식!
+      - 결국 client와 비동기 통신을 하면서, 필요에 따라 내부 MicroService에 비동기 API 통신을 또 하여 데이터를 요청하고 받아와서 그것을 client에게 return 하는 구조!
+      - WebClient Configure
+        - 
+        ```
+          @Configuration
+          public class WebClientConfig {
+
+              @Bean
+              public WebClient webClient(WebClient.Builder builder) {
+                  return builder.build();
+              }
+          }
+        ```
+      - WebClient Controller 
+        - 
+          ```
+            @RestController
+            @RequestMapping("/v1/movies")
+            public class MoviesController {
+
+                private MoviesInfoRestClient moviesInfoRestClient;
+                private ReviewsRestClient reviewsRestClient;
+
+                public MoviesController(MoviesInfoRestClient moviesInfoRestClient, ReviewsRestClient reviewsRestClient) {
+                    this.moviesInfoRestClient = moviesInfoRestClient;
+                    this.reviewsRestClient = reviewsRestClient;
+                }
+
+                @GetMapping("/{id}")
+                public Mono<Movie> retrieveMovieById(@PathVariable("id") String movieId){
+
+                    return moviesInfoRestClient.retrieveMovieInfo(movieId)
+                            //moviesInfoRestClient.retrieveMovieInfo_exchange(movieId)
+                            .flatMap(movieInfo -> {
+                                var reviewList = reviewsRestClient.retrieveReviews(movieId)
+                                        .collectList();
+                               return reviewList.map(reviews -> new Movie(movieInfo, reviews));
+                            });
+
+                }
+          ```
+      - WebClient
+        - 
+          ```
+            @Component
+            @Slf4j
+            public class MoviesInfoRestClient {
+
+                private WebClient webClient;
+
+                @Value("${restClient.moviesInfoUrl}")
+                private String moviesInfoUrl;
+
+                public MoviesInfoRestClient(WebClient webClient) {
+                    this.webClient = webClient;
+                }
+
+                public Mono<MovieInfo> retrieveMovieInfo(String movieId) {
+
+                    var url = moviesInfoUrl.concat("/{id}");
+                    /*var retrySpec = RetrySpec.fixedDelay(3, Duration.ofSeconds(1))
+                            .filter((ex) -> ex instanceof MoviesInfoServerException)
+                            .onRetryExhaustedThrow(((retryBackoffSpec, retrySignal) -> Exceptions.propagate(retrySignal.failure())));*/
+
+                    return webClient.get()
+                            .uri(url, movieId)
+                            .retrieve()
+                            .onStatus(HttpStatus::is4xxClientError, (clientResponse -> {
+                                log.info("Status code : {}", clientResponse.statusCode().value());
+                                if (clientResponse.statusCode().equals(HttpStatus.NOT_FOUND)) {
+                                    return Mono.error(new MoviesInfoClientException("There is no MovieInfo available for the passed in Id : " + movieId, clientResponse.statusCode().value()));
+                                }
+                                return clientResponse.bodyToMono(String.class)
+                                        .flatMap(response -> Mono.error(new MoviesInfoClientException(response, clientResponse.statusCode().value())));
+                            }))
+                            .onStatus(HttpStatus::is5xxServerError, (clientResponse -> {
+                                log.info("Status code : {}", clientResponse.statusCode().value());
+                                return clientResponse.bodyToMono(String.class)
+                                        .flatMap(response -> Mono.error(new MoviesInfoServerException(response)));
+                            }))
+                            .bodyToMono(MovieInfo.class)
+                           //.retry(3)
+                            //.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+                            .retryWhen(RetryUtil.retrySpec())
+                            .log();
+
+                }
+          ```
